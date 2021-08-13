@@ -1,4 +1,5 @@
 from time import process_time
+import gym
 import numpy as np
 from mj_envs.envs import env_base
 from mj_envs.utils.xml_utils import reassign_parent
@@ -78,8 +79,7 @@ class FMBase(env_base.MujocoEnv):
         "bonus": 4.0,
         "penalty": -50,
     }
-
-    def __init__(self, model_path, config_path, target_pose, **kwargs):
+    def __init__(self, model_path, **kwargs):
 
         curr_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -94,6 +94,29 @@ class FMBase(env_base.MujocoEnv):
         # self.sim = env_base.get_sim(model_path=processed_model_path)
         # self.sim_obsd = env_base.get_sim(model_path=processed_model_path)
         # os.remove(processed_model_path)
+        # EzPickle.__init__(**locals()) is capturing the input dictionary of the init method of this class.
+        # In order to successfully capture all arguments we need to call gym.utils.EzPickle.__init__(**locals())
+        # at the leaf level, when we do inheritance like we do here.
+        # kwargs is needed at the top level to account for injection of __class__ keyword.
+        # Also see: https://github.com/openai/gym/pull/1497
+        gym.utils.EzPickle.__init__(self, model_path, **kwargs)
+
+        # This two step construction is required for pickling to work correctly. All arguments to all __init__
+        # calls must be pickle friendly. Things like sim / sim_obsd are NOT pickle friendly. Therefore we
+        # first construct the inheritance chain, which is just __init__ calls all the way down, with env_base
+        # creating the sim / sim_obsd instances. Next we run through "setup"  which relies on sim / sim_obsd
+        # created in __init__ to complete the setup.
+        super().__init__(model_path=processed_model_path)
+        os.remove(processed_model_path)
+
+        self._setup(**kwargs)
+
+
+    def _setup(self, 
+               target_pose, 
+               obs_keys=DEFAULT_OBS_KEYS,
+               weighted_reward_keys=DEFAULT_RWD_KEYS_AND_WEIGHTS,
+               **kwargs):
 
         self.target_pose = target_pose
 
