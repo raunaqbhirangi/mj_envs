@@ -2,7 +2,7 @@ from time import process_time
 import gym
 import numpy as np
 from mj_envs.envs import env_base
-from mj_envs.utils.xml_utils import reassign_parent
+# from mj_envs.utils.xml_utils import reassign_parent
 import os
 import collections
 
@@ -17,12 +17,15 @@ class DManusBase(env_base.MujocoEnv):
         "penalty": -50,
     }
 
-    def __init__(self, model_path, config_path, target_pose, **kwargs):
+    def __init__(self, model_path, config_path, target_pose, use_mags=False, **kwargs):
 
         curr_dir = os.path.dirname(os.path.abspath(__file__))
 
         self.target_pose = target_pose
-        
+        self.use_mags = use_mags
+        if use_mags:
+            self.DEFAULT_OBS_KEYS.append('mag')
+
         env_base.MujocoEnv.__init__(self,
                                 curr_dir+model_path)
         
@@ -39,7 +42,7 @@ class DManusBase(env_base.MujocoEnv):
             is_hardware = False,
             config_path = config_path,
             # rwd_viz = False,
-            robot_name = 'fm', 
+            robot_name = 'dmanus', 
         )
 
 
@@ -49,6 +52,8 @@ class DManusBase(env_base.MujocoEnv):
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
         obs_dict['pose_err'] = obs_dict['qp'] - self.target_pose
+        if self.use_mags:
+            obs_dict['mag'] = self.get_mag_obs(sim)
         return obs_dict
 
 
@@ -68,6 +73,12 @@ class DManusBase(env_base.MujocoEnv):
         ))
         rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
         return rwd_dict
+    
+    def get_mag_obs(self, sim):
+        # Get contact points and compute resulting magnetic fields
+        print([(i,c.geom1,c.geom2) for i,c in enumerate(sim.data.contact)])
+        print(sim.data.contact[5].pos)
+        return np.zeros((15,))
 
 class FMBase(env_base.MujocoEnv):
 
