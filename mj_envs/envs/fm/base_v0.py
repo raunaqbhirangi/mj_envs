@@ -75,9 +75,58 @@ class DManusBase(env_base.MujocoEnv):
         return rwd_dict
     
     def get_mag_obs(self, sim):
-        # Get contact points and compute resulting magnetic fields
-        print([(i,c.geom1,c.geom2) for i,c in enumerate(sim.data.contact)])
-        print(sim.data.contact[5].pos)
+        '''
+        Use simulation data to identif contacts. Use contact location and force 
+        to simulate magnetic field data from ReSkin. 
+
+        Parameters
+        ----------
+        sim: MjSim object
+        '''
+        
+        # Check for contacts
+        contacts = []
+        contacts = [c for c in sim.data.contact if c.geom1 != 0]
+        print(len(contacts))
+        
+        for c in contacts:
+            # Get ids for the colliding bodies            
+            body1_id = sim.model.geom_bodyid[c.geom1]
+            body2_id = sim.model.geom_bodyid[c.geom2]
+            
+            # For now just assumes that the second geom is on the hand.
+            # TODO: Ask vikash how to check if it belongs to dmanus.
+            body2_xpos = sim.data.body_xpos[body2_id]
+            body2_xmat = sim.data.body_xmat[body2_id].reshape((3,3))
+
+            body2_local = body2_xmat.T @ (c.pos - body2_xpos)
+
+            print(sim.model.body_id2name(body1_id), sim.model.body_id2name(body2_id), sim.model.geom_id2name(c.geom2))
+            print(sim.data.time, c.pos, body2_local,c.dist)
+            # print(sim.data.geom_xpos[c.geom1], sim.data.geom_xpos[c.geom2])
+            
+            # v0.1: Just color the closest magnetometer
+
+            # Filter sites with body id matching collision body
+            sites_mask = (sim.model.site_bodyid == body2_id)
+            
+            # Find site closest to contact point, if there are any
+            # sites on the body
+            if np.sum(sites_mask) != 0:
+                sites_dist = np.linalg.norm(
+                    sim.data.site_xpos[sites_mask] - c.pos, axis=-1)
+                closest_site = np.argmin(sites_dist)
+                closest_site_id = np.arange(len(sites_mask))[sites_mask][closest_site]
+                
+                # Change color to red
+                sim.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
+                print(closest_site_id,
+                    sim.model.site_id2name(closest_site_id), 
+                    sim.model.site_rgba[closest_site_id])
+            
+        # Light up closest magnetometer
+            
+        # print(sim.data.contact[0].pos)
         return np.zeros((15,))
 
 class FMBase(env_base.MujocoEnv):

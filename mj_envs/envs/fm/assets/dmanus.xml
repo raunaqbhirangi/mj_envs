@@ -18,6 +18,10 @@
         <body name="stand" pos="0 -0.2 0.05" euler="-1.57 0 0">
             <include file="../../../sims/dmanus_sim/assets/dmanus_chain.xml"/>
         </body>
-
+        
+        <body name="ball" pos="0 0 0">
+            <geom type="sphere" pos="0.08 -0.15 0.15" size="0.05" rgba="0.4 0.0 0.0 1" contype="1" conaffinity="1" condim="4" name="testball"/>
+            <!-- <joint type="free"/> -->
+        </body>
     </worldbody>
 </mujoco>
