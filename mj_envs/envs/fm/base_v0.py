@@ -97,7 +97,10 @@ class DManusBase(env_base.MujocoEnv):
         num_mags = len(self.mag_names)
         mag_obs = np.zeros((num_mags, 3))
 
-        # Detection threshold for magnetometer
+        # Create a copy of original colors
+        colors = self.site_colors.copy()
+
+        # Detection threshold distance for magnetometer
         mag_thres = 10.
 
         # Check for contacts
@@ -135,7 +138,7 @@ class DManusBase(env_base.MujocoEnv):
             
                   
                 # Change color to red
-                self.sim.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
+                colors[closest_site_id] = [1.,0.,0.,1.]
 
                 # v1.0: Predict magnetic field for all magnetometers within
                 # range
@@ -145,6 +148,8 @@ class DManusBase(env_base.MujocoEnv):
                 mag_output = np.zeros((np.sum(sites_mask), 3))
 
                 mag_obs[sites_mask[self.mag_mask]] = mag_output
+
+        self.sim.model.site_rgba[:,:] = colors
 
         return mag_obs.reshape((-1,))
 
