@@ -32,16 +32,16 @@ class DManusBase(env_base.MujocoEnv):
         
         if use_mags:
             self.DEFAULT_OBS_KEYS.append('mag')            
+            
             # Find number of magnetometers
             num_sites = len(self.sim.data.site_xpos)
             site_names = list(map(self.sim.model.site_id2name, [i for i in range(num_sites)]))
             self.mag_mask = [True if 'mag' in site_names[i] else False for i in range(num_sites)]
             self.mag_names = [name for name in site_names if 'mag' in name]
+            
             self.site_colors = self.sim.model.site_rgba.copy()
-            # ipdb.set_trace()
-
-        env_base.MujocoEnv._setup(self, 
-            obs_keys=self.DEFAULT_OBS_KEYS,
+        
+        self._setup(obs_keys=self.DEFAULT_OBS_KEYS,
             weighted_reward_keys = self.DEFAULT_RWD_KEYS_AND_WEIGHTS,
             reward_mode = "dense",             
             frame_skip = 40,
@@ -52,7 +52,29 @@ class DManusBase(env_base.MujocoEnv):
             is_hardware = False,
             config_path = config_path,
             # rwd_viz = False,
-            robot_name = 'dmanus', 
+            robot_name = 'dmanus')
+    
+    def _setup(self,
+               obs_keys,
+               weighted_reward_keys,
+               reward_mode = "dense",
+               frame_skip = 1,
+               normalize_act = True,
+               obs_range = (-10, 10),
+               seed = None,
+               rwd_viz = False,
+               **kwargs):
+        
+        env_base.MujocoEnv._setup(self, 
+            obs_keys=obs_keys,
+            weighted_reward_keys = weighted_reward_keys,
+            reward_mode = reward_mode,             
+            frame_skip = frame_skip,
+            normalize_act = normalize_act,
+            obs_range = obs_range,
+            seed = seed,
+            rwd_viz = rwd_viz,
+            **kwargs
         )
             
 
@@ -86,7 +108,7 @@ class DManusBase(env_base.MujocoEnv):
     
     def get_mag_obs(self, sim):
         '''
-        Use simulation data to identif contacts. Use contact location and force 
+        Use simulation data to identify contacts. Use contact location and force 
         to simulate magnetic field data from ReSkin. 
 
         Parameters
@@ -111,17 +133,11 @@ class DManusBase(env_base.MujocoEnv):
             body1_id = sim.model.geom_bodyid[c.geom1]
             body2_id = sim.model.geom_bodyid[c.geom2]
             
+            body2_xmat = sim.data.xmat[body2_id].reshape((3,3))
             # For now just assumes that the second geom is on the hand.
             # TODO: Ask vikash how to check if it belongs to dmanus.
-            body2_xpos = sim.data.body_xpos[body2_id]
-            body2_xmat = sim.data.body_xmat[body2_id].reshape((3,3))
+            # ipdb.set_trace()
 
-            body2_local = body2_xmat.T @ (c.pos - body2_xpos)
-
-            # print(sim.model.body_id2name(body1_id), sim.model.body_id2name(body2_id), sim.model.geom_id2name(c.geom2))
-            # print(sim.data.time, c.pos, body2_local,c.dist)
-            # print(sim.data.geom_xpos[c.geom1], sim.data.geom_xpos[c.geom2])
-                        
             # Filter sites with body id matching collision body and make 
             # sure they're magnetometers
             sites_mask = (sim.model.site_bodyid == body2_id) * self.mag_mask
@@ -143,8 +159,11 @@ class DManusBase(env_base.MujocoEnv):
                 # v1.0: Predict magnetic field for all magnetometers within
                 # range
                 mags_in_range = sites_dist < mag_thres
-                
-                # mag_output = fn(sites_r, mags_in_range)
+                # Need to project sites_r to mag coordinate frame
+                # ipdb.set_trace()
+
+                sites_r_local = sites_r @ body2_xmat
+                # mag_output = fn(sites_r_local, mags_in_range)
                 mag_output = np.zeros((np.sum(sites_mask), 3))
 
                 mag_obs[sites_mask[self.mag_mask]] = mag_output
