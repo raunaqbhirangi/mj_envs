@@ -35,6 +35,7 @@ register(
             'model_path': '/assets/dmanus.xml',
             'config_path': curr_dir+'/assets/dmanus.config',
             'target_pose': np.array([0, 1, 1, 0, 1, 1, 0, 1, 1]),
-            'use_mags': True
+            'use_mags': True,
+            # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
         }
 )

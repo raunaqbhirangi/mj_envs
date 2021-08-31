@@ -5,6 +5,7 @@ from mj_envs.envs import env_base
 # from mj_envs.utils.xml_utils import reassign_parent
 import os
 import collections
+import torch
 
 import ipdb
 
@@ -63,6 +64,7 @@ class DManusBase(env_base.MujocoEnv):
                obs_range = (-10, 10),
                seed = None,
                rwd_viz = False,
+               mag_model_path= None,
                **kwargs):
         
         env_base.MujocoEnv._setup(self, 
@@ -76,6 +78,11 @@ class DManusBase(env_base.MujocoEnv):
             rwd_viz = rwd_viz,
             **kwargs
         )
+
+        if mag_model_path is not None:
+            self.mag_model = torch.load(mag_model_path)
+        else:
+            self.mag_model = lambda x: torch.zeros(len(x),3)
             
 
     def get_obs_dict(self, sim):
@@ -133,7 +140,7 @@ class DManusBase(env_base.MujocoEnv):
             body1_id = sim.model.geom_bodyid[c.geom1]
             body2_id = sim.model.geom_bodyid[c.geom2]
             
-            body2_xmat = sim.data.xmat[body2_id].reshape((3,3))
+            body2_xmat = sim.data.body_xmat[body2_id].reshape((3,3))
             # For now just assumes that the second geom is on the hand.
             # TODO: Ask vikash how to check if it belongs to dmanus.
             # ipdb.set_trace()
@@ -163,7 +170,7 @@ class DManusBase(env_base.MujocoEnv):
                 # ipdb.set_trace()
 
                 sites_r_local = sites_r @ body2_xmat
-                # mag_output = fn(sites_r_local, mags_in_range)
+                mag_output = self.get_mag_output(sites_r_local, mags_in_range)
                 mag_output = np.zeros((np.sum(sites_mask), 3))
 
                 mag_obs[sites_mask[self.mag_mask]] = mag_output
@@ -172,7 +179,12 @@ class DManusBase(env_base.MujocoEnv):
 
         return mag_obs.reshape((-1,))
 
-    # def 
+    def get_mag_output(self, contact_location, mags_in_range):
+        magout = np.zeros((len(contact_location),3))
+        with torch.no_grad():
+            magout[mags_in_range] = self.mag_model(
+                contact_location[mags_in_range]).detach().numpy()
+        return magout
 
 class FMBase(env_base.MujocoEnv):
 
