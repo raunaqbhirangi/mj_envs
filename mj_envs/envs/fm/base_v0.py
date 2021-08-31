@@ -34,9 +34,11 @@ class DManusBase(env_base.MujocoEnv):
             self.DEFAULT_OBS_KEYS.append('mag')            
             # Find number of magnetometers
             num_sites = len(self.sim.data.site_xpos)
-            site_names = map(self.sim.model.site_id2name, [i for i in range(num_sites)])
+            site_names = list(map(self.sim.model.site_id2name, [i for i in range(num_sites)]))
+            self.mag_mask = [True if 'mag' in site_names[i] else False for i in range(num_sites)]
             self.mag_names = [name for name in site_names if 'mag' in name]
-            ipdb.set_trace()
+            self.site_colors = self.sim.model.site_rgba.copy()
+            # ipdb.set_trace()
 
         env_base.MujocoEnv._setup(self, 
             obs_keys=self.DEFAULT_OBS_KEYS,
@@ -93,17 +95,16 @@ class DManusBase(env_base.MujocoEnv):
         '''
 
         num_mags = len(self.mag_names)
+        mag_obs = np.zeros((num_mags, 3))
 
         # Detection threshold for magnetometer
         mag_thres = 10.
 
         # Check for contacts
-        contacts = []
-        contacts = [c for c in sim.data.contact if c.geom1 != 0]
-        print(len(contacts))
-        
-        for c in contacts:
-            # Get ids for the colliding bodies            
+        for con_id in range(sim.data.ncon):
+            c = sim.data.contact[con_id]
+
+            # Get ids for the colliding bodies
             body1_id = sim.model.geom_bodyid[c.geom1]
             body2_id = sim.model.geom_bodyid[c.geom2]
             
@@ -118,8 +119,9 @@ class DManusBase(env_base.MujocoEnv):
             # print(sim.data.time, c.pos, body2_local,c.dist)
             # print(sim.data.geom_xpos[c.geom1], sim.data.geom_xpos[c.geom2])
                         
-            # Filter sites with body id matching collision body
-            sites_mask = (sim.model.site_bodyid == body2_id)
+            # Filter sites with body id matching collision body and make 
+            # sure they're magnetometers
+            sites_mask = (sim.model.site_bodyid == body2_id) * self.mag_mask
             
             # Find site closest to contact point, if there are any
             # sites on the body
@@ -134,27 +136,19 @@ class DManusBase(env_base.MujocoEnv):
                   
                 # Change color to red
                 self.sim.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
-                # self.sim_obsd.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
-                # print(closest_site_id,
-                #     sim.model.site_id2name(closest_site_id), 
-                #     sim.model.site_rgba[closest_site_id])
 
-                # import ipdb; ipdb.set_trace()
-                
                 # v1.0: Predict magnetic field for all magnetometers within
                 # range
                 mags_in_range = sites_dist < mag_thres
                 
-                # mag_output = fn(sites_r[mags_in_range], )
+                # mag_output = fn(sites_r, mags_in_range)
+                mag_output = np.zeros((np.sum(sites_mask), 3))
 
-                               
+                mag_obs[sites_mask[self.mag_mask]] = mag_output
 
-            #
-            # Find magnetometer within threshold distance of contact. 
+        return mag_obs.reshape((-1,))
 
-            
-        # print(sim.data.contact[0].pos)
-        return np.zeros((15,))
+    # def 
 
 class FMBase(env_base.MujocoEnv):
 
