@@ -6,6 +6,8 @@ from mj_envs.envs import env_base
 import os
 import collections
 
+import ipdb
+
 class DManusBase(env_base.MujocoEnv):
 
     DEFAULT_OBS_KEYS = [
@@ -23,12 +25,18 @@ class DManusBase(env_base.MujocoEnv):
 
         self.target_pose = target_pose
         self.use_mags = use_mags
-        if use_mags:
-            self.DEFAULT_OBS_KEYS.append('mag')
+        
 
         env_base.MujocoEnv.__init__(self,
                                 curr_dir+model_path)
         
+        if use_mags:
+            self.DEFAULT_OBS_KEYS.append('mag')            
+            # Find number of magnetometers
+            num_sites = len(self.sim.data.site_xpos)
+            site_names = map(self.sim.model.site_id2name, [i for i in range(num_sites)])
+            self.mag_names = [name for name in site_names if 'mag' in name]
+            ipdb.set_trace()
 
         env_base.MujocoEnv._setup(self, 
             obs_keys=self.DEFAULT_OBS_KEYS,
@@ -44,7 +52,7 @@ class DManusBase(env_base.MujocoEnv):
             # rwd_viz = False,
             robot_name = 'dmanus', 
         )
-
+            
 
     def get_obs_dict(self, sim):
         obs_dict = {}
@@ -83,7 +91,12 @@ class DManusBase(env_base.MujocoEnv):
         ----------
         sim: MjSim object
         '''
-        
+
+        num_mags = len(self.mag_names)
+
+        # Detection threshold for magnetometer
+        mag_thres = 10.
+
         # Check for contacts
         contacts = []
         contacts = [c for c in sim.data.contact if c.geom1 != 0]
@@ -101,30 +114,44 @@ class DManusBase(env_base.MujocoEnv):
 
             body2_local = body2_xmat.T @ (c.pos - body2_xpos)
 
-            print(sim.model.body_id2name(body1_id), sim.model.body_id2name(body2_id), sim.model.geom_id2name(c.geom2))
-            print(sim.data.time, c.pos, body2_local,c.dist)
+            # print(sim.model.body_id2name(body1_id), sim.model.body_id2name(body2_id), sim.model.geom_id2name(c.geom2))
+            # print(sim.data.time, c.pos, body2_local,c.dist)
             # print(sim.data.geom_xpos[c.geom1], sim.data.geom_xpos[c.geom2])
-            
-            # v0.1: Just color the closest magnetometer
-
+                        
             # Filter sites with body id matching collision body
             sites_mask = (sim.model.site_bodyid == body2_id)
             
             # Find site closest to contact point, if there are any
             # sites on the body
             if np.sum(sites_mask) != 0:
-                sites_dist = np.linalg.norm(
-                    sim.data.site_xpos[sites_mask] - c.pos, axis=-1)
+                sites_r = sim.data.site_xpos[sites_mask] - c.pos
+                sites_dist = np.linalg.norm(sites_r, axis=-1)
+                
+                # v0.1: Just light up the closest magnetometer  
                 closest_site = np.argmin(sites_dist)
                 closest_site_id = np.arange(len(sites_mask))[sites_mask][closest_site]
-                
-                # Change color to red
-                sim.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
-                print(closest_site_id,
-                    sim.model.site_id2name(closest_site_id), 
-                    sim.model.site_rgba[closest_site_id])
             
-        # Light up closest magnetometer
+                  
+                # Change color to red
+                self.sim.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
+                # self.sim_obsd.model.site_rgba[closest_site_id,:] = [1.,0.,0.,1.]
+                # print(closest_site_id,
+                #     sim.model.site_id2name(closest_site_id), 
+                #     sim.model.site_rgba[closest_site_id])
+
+                # import ipdb; ipdb.set_trace()
+                
+                # v1.0: Predict magnetic field for all magnetometers within
+                # range
+                mags_in_range = sites_dist < mag_thres
+                
+                # mag_output = fn(sites_r[mags_in_range], )
+
+                               
+
+            #
+            # Find magnetometer within threshold distance of contact. 
+
             
         # print(sim.data.contact[0].pos)
         return np.zeros((15,))
