@@ -94,7 +94,7 @@ if __name__ == '__main__':
                 sens_raw.reshape((-1,3,1)))
 
             label_mags = torch.squeeze(label_mags/mag_std.view(1,3,1))
-            ipdb.set_trace()
+            # ipdb.set_trace()
             pred_mags = model(force_locs)
             
             # Compute Loss
@@ -105,3 +105,23 @@ if __name__ == '__main__':
 
             total_loss += loss.item()
         print('Epoch: {}: Loss: {:.2e}'.format(e+1, total_loss))
+    
+    # Test loop
+    test_data = data[:10]
+    loc, sens, force = test_data.values()
+    loc = torch.from_numpy(loc)
+    sens = torch.from_numpy(sens)
+    force = torch.from_numpy(force)
+
+    sens_raw = (sens.float() * data_mag_std)
+    label_mags = torch.matmul(
+                mag_tfs.repeat(sens.shape[0],1,1),
+                sens_raw.reshape((-1,3,1))).squeeze()
+
+    force_locs = torch.repeat_interleave(loc.float(),5,dim=0)[...,:2] - mag_locations.repeat(loc.shape[0],1)
+    force_locs_norm = (force_locs - input_mean)/input_std
+
+    pred_mags = model(force_locs)
+    print('Predictions:')
+    print(pred_mags[...,:3] * mag_std.view(1,3) - label_mags)
+    print(torch.exp(pred_mags[...,3:]) * mag_std.view(1,3))
