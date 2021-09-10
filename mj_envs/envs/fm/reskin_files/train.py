@@ -1,5 +1,5 @@
 import numpy as np
-
+import yaml
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,7 +19,22 @@ def GaussianNLLLoss(input_t:torch.tensor, target_t:torch.tensor, var_t:torch.ten
     # ipdb.set_trace()    
     return torch.mean(loss)
     
+class ReSkinSim(nn.Module):
+    def __init__(self):
+        super(ReSkinSim, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(n_input,64),
+            nn.ReLU(),
+            nn.Linear(64,64),
+            nn.ReLU(),
+            nn.Linear(64,64),
+            nn.ReLU(),
+            nn.Linear(64,2*n_output)
+        )
 
+    def forward(self, input_t):
+        return self.model(input_t)
+    
 if __name__ == '__main__':
     data = MagneticSensorData(['./data'],2,scale_std=1)
     
@@ -30,8 +45,9 @@ if __name__ == '__main__':
     n_input = 2
     n_output = 3
 
-    input_mean, input_std = 8.,8.
+    input_mean, input_std = 0.,8.
 
+    
     mag_locations = torch.tensor([
         [8.,8.],
         [1.,8.],
@@ -63,17 +79,15 @@ if __name__ == '__main__':
     mag_std_tf = torch.abs(torch.matmul(mag_tfs, mag_std_raw))
     mag_std = torch.sqrt(torch.mean(torch.square(torch.squeeze(mag_std_tf)),axis=0))
 
+    config = {
+        'input_mean':input_mean,
+        'input_std': input_std,
+        'mag_std': mag_std   
+    }
     # ipdb.set_trace()
     trainLoader = DataLoader(data, batch_size = batch_size, shuffle=True)
-    model = nn.Sequential(
-        nn.Linear(n_input,64),
-        nn.ReLU(),
-        nn.Linear(64,64),
-        nn.ReLU(),
-        nn.Linear(64,64),
-        nn.ReLU(),
-        nn.Linear(64,2*n_output)
-    )
+    
+    model = ReSkinSim()
     opt = optim.Adam(model.parameters(), lr=1e-3)
 
     for e in range(n_epochs):
@@ -105,6 +119,10 @@ if __name__ == '__main__':
 
             total_loss += loss.item()
         print('Epoch: {}: Loss: {:.2e}'.format(e+1, total_loss))
+    
+    torch.save(model.state_dict(), './reskin_sim_weights')
+    with open('./model_config.yaml','w') as f:
+        yaml.dump(config, f)
     
     # Test loop
     test_data = data[:10]
