@@ -6,7 +6,9 @@ from mj_envs.envs import env_base
 import os
 import collections
 import torch
+import yaml
 
+from .reskin_files.train import ReSkinSim
 import ipdb
 
 class DManusBase(env_base.MujocoEnv):
@@ -41,6 +43,11 @@ class DManusBase(env_base.MujocoEnv):
             self.mag_names = [name for name in site_names if 'mag' in name]
             
             self.site_colors = self.sim.model.site_rgba.copy()
+            self.mag_model = ReSkinSim()
+            self.mag_model.load_state_dict(
+                torch.load(curr_dir+'/reskin_files/reskin_sim_weights'))
+            with open(curr_dir + '/reskin_files/model_config.yaml','r') as f:
+                self.mag_model_config = yaml.safe_load(f)
         
         self._setup(obs_keys=self.DEFAULT_OBS_KEYS,
             weighted_reward_keys = self.DEFAULT_RWD_KEYS_AND_WEIGHTS,
@@ -79,10 +86,10 @@ class DManusBase(env_base.MujocoEnv):
             **kwargs
         )
 
-        if mag_model_path is not None:
-            self.mag_model = torch.load(mag_model_path)
-        else:
-            self.mag_model = lambda x: torch.zeros(len(x),3)
+        # if mag_model_path is not None:
+        #     self.mag_model = torch.load(mag_model_path)
+        # else:
+        #     self.mag_model = lambda x: torch.zeros(len(x),3)
             
 
     def get_obs_dict(self, sim):
@@ -130,7 +137,8 @@ class DManusBase(env_base.MujocoEnv):
         colors = self.site_colors.copy()
 
         # Detection threshold distance for magnetometer
-        mag_thres = 10.
+        # (16 mm Manhattan distance)
+        mag_thres = 0.035
 
         # Check for contacts
         for con_id in range(sim.data.ncon):
@@ -152,38 +160,55 @@ class DManusBase(env_base.MujocoEnv):
             # Find site closest to contact point, if there are any
             # sites on the body
             if np.sum(sites_mask) != 0:
-                sites_r = sim.data.site_xpos[sites_mask] - c.pos
-                sites_dist = np.linalg.norm(sites_r, axis=-1)
+                sites_r = c.pos - sim.data.site_xpos[sites_mask]
+                sites_r_local = sites_r @ body2_xmat
+
+                sites_dist = np.linalg.norm(sites_r_local[...,::2], ord=2, axis=-1)
+                # sites_mandist = np.linalg.norm(sites_r, ord=1, axis=-1)
                 
                 # v0.1: Just light up the closest magnetometer  
                 closest_site = np.argmin(sites_dist)
                 closest_site_id = np.arange(len(sites_mask))[sites_mask][closest_site]
             
                   
-                # Change color to red
-                colors[closest_site_id] = [1.,0.,0.,1.]
+                # # Change color to red
+                # colors[closest_site_id] = [1.,0.,0.,1.]
 
                 # v1.0: Predict magnetic field for all magnetometers within
                 # range
                 mags_in_range = sites_dist < mag_thres
+                mags_in_range_ids = np.arange(len(sites_mask))[sites_mask][mags_in_range]
                 # Need to project sites_r to mag coordinate frame
                 # ipdb.set_trace()
 
-                sites_r_local = sites_r @ body2_xmat
-                mag_output = self.get_mag_output(sites_r_local, mags_in_range)
-                mag_output = np.zeros((np.sum(sites_mask), 3))
+                contact_location_xy = sites_r_local[...,::2]
+                mag_output = self.get_mag_output(contact_location_xy, mags_in_range, mag_thres)
 
                 mag_obs[sites_mask[self.mag_mask]] = mag_output
+
+                # Color magnetometers based on outputs
+                mags_in_range_ids = np.arange(len(sites_mask))[sites_mask][mags_in_range]
+                colors[mags_in_range_ids,:3] = np.clip(0.5 + mag_output[mags_in_range]/2,-1.,1.)
 
         self.sim.model.site_rgba[:,:] = colors
 
         return mag_obs.reshape((-1,))
 
-    def get_mag_output(self, contact_location, mags_in_range):
-        magout = np.zeros((len(contact_location),3))
+    def get_mag_output(self, contact_location_xy, mags_in_range, mag_thres):
+        # Default scaling for input distances is 8mm. Magnetometers here are much further apart.
+        # So we use a different scaling factor to make sure NN inputs stay within distribution.
+        curr_scaling_mm = self.mag_model_config['input_std']*0.001
+        new_scaling = mag_thres/np.sqrt(2)
+        magout = np.zeros((len(contact_location_xy),3))
+        scaled_loc = torch.tensor(contact_location_xy/new_scaling, dtype=torch.float)
+
         with torch.no_grad():
-            magout[mags_in_range] = self.mag_model(
-                contact_location[mags_in_range]).detach().numpy()
+            magdist = self.mag_model(scaled_loc)
+            magdist = magdist[mags_in_range]
+        magout[mags_in_range] = torch.distributions.normal.Normal(
+            magdist[...,:3], torch.exp(magdist[...,3:])).sample()
+        # magout[mags_in_range] = magdist[...,:3]
+
         return magout
 
 class FMBase(env_base.MujocoEnv):

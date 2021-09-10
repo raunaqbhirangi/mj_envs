@@ -5,7 +5,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from data_handling import MagneticSensorData
+try:
+    from .data_handling import MagneticSensorData
+except:
+    from data_handling import MagneticSensorData
 
 import ipdb
 
@@ -20,7 +23,7 @@ def GaussianNLLLoss(input_t:torch.tensor, target_t:torch.tensor, var_t:torch.ten
     return torch.mean(loss)
     
 class ReSkinSim(nn.Module):
-    def __init__(self):
+    def __init__(self, n_input=2, n_output=3):
         super(ReSkinSim, self).__init__()
         self.model = nn.Sequential(
             nn.Linear(n_input,64),
@@ -78,11 +81,13 @@ if __name__ == '__main__':
     mag_std_raw = torch.tensor(data.sensor_std.reshape((5,3,1)), dtype=torch.float)
     mag_std_tf = torch.abs(torch.matmul(mag_tfs, mag_std_raw))
     mag_std = torch.sqrt(torch.mean(torch.square(torch.squeeze(mag_std_tf)),axis=0))
+    mag_std_scale = 3.
 
     config = {
         'input_mean':input_mean,
         'input_std': input_std,
-        'mag_std': mag_std   
+        'mag_std': mag_std.tolist(),
+        'mag_std_scale': mag_std_scale,
     }
     # ipdb.set_trace()
     trainLoader = DataLoader(data, batch_size = batch_size, shuffle=True)
@@ -107,7 +112,7 @@ if __name__ == '__main__':
                 mag_tfs.repeat(sens.shape[0],1,1),
                 sens_raw.reshape((-1,3,1)))
 
-            label_mags = torch.squeeze(label_mags/mag_std.view(1,3,1))
+            label_mags = torch.squeeze(label_mags/(mag_std_scale*mag_std.view(1,3,1)))
             # ipdb.set_trace()
             pred_mags = model(force_locs)
             
@@ -142,4 +147,4 @@ if __name__ == '__main__':
     pred_mags = model(force_locs)
     print('Predictions:')
     print(pred_mags[...,:3] * mag_std.view(1,3) - label_mags)
-    print(torch.exp(pred_mags[...,3:]) * mag_std.view(1,3))
+    print(torch.exp(pred_mags[...,3:]) * mag_std.view(1,3)*mag_std_scale)
