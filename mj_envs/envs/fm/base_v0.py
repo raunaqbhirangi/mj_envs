@@ -170,7 +170,6 @@ class DManusBase(env_base.MujocoEnv):
                 closest_site = np.argmin(sites_dist)
                 closest_site_id = np.arange(len(sites_mask))[sites_mask][closest_site]
             
-                  
                 # # Change color to red
                 # colors[closest_site_id] = [1.,0.,0.,1.]
 
