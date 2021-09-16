@@ -36,9 +36,10 @@ class DManusBase(env_base.MujocoEnv):
 
         env_base.MujocoEnv.__init__(self,
                                 curr_dir+model_path)
+        self.obs_keys = self.DEFAULT_OBS_KEYS.copy()
         
         if use_mags:
-            self.DEFAULT_OBS_KEYS.append('mag')            
+            self.obs_keys.append('mag')            
             
             # Find number of magnetometers
             num_sites = len(self.sim.data.site_xpos)
@@ -54,7 +55,7 @@ class DManusBase(env_base.MujocoEnv):
                 self.mag_model_config = yaml.safe_load(f)
         
         self._setup(obs_keys=self.DEFAULT_OBS_KEYS,
-            weighted_reward_keys = self.DEFAULT_RWD_KEYS_AND_WEIGHTS,
+            weighted_reward_keys = self.obs_keys,
             reward_mode = "dense",             
             frame_skip = 40,
             normalize_act = True,
@@ -89,12 +90,6 @@ class DManusBase(env_base.MujocoEnv):
             rwd_viz = rwd_viz,
             **kwargs
         )
-
-        # if mag_model_path is not None:
-        #     self.mag_model = torch.load(mag_model_path)
-        # else:
-        #     self.mag_model = lambda x: torch.zeros(len(x),3)
-            
 
     def get_obs_dict(self, sim):
         obs_dict = {}
