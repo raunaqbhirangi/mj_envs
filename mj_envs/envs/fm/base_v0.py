@@ -22,7 +22,11 @@ class DManusBase(env_base.MujocoEnv):
         "penalty": -50,
     }
 
-    def __init__(self, model_path, config_path, target_pose, use_mags=False, **kwargs):
+    def __init__(self, 
+        model_path, 
+        config_path, 
+        target_pose, 
+        use_mags=False, **kwargs):
 
         curr_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -328,6 +332,10 @@ class DManusEnvFixed(DManusBase):
         obs = super().reset(self.init_qpos, self.init_qvel)
         return obs
 
+class DManusEnvWrist(DManusBase):
+    def reset(self):
+        obs = super().reset(self.init_qpos, self.init_qvel)
+        return obs
 
 class FMReachEnvFixed(FMBase):
 
