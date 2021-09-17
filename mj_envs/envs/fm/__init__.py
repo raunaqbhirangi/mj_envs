@@ -29,13 +29,13 @@ register(
 
 register(
     id='DManusReachFixed-v0',
-    entry_point='mj_envs.envs.fm.base_v0:DManusEnvFixed',
+    entry_point='mj_envs.envs.fm.reach_v0:DManusReachFixed',
     max_episode_steps=50, #50steps*40Skip*2ms = 4s
     kwargs={
             'model_path': '/assets/dmanus.xml',
             'config_path': curr_dir+'/assets/dmanus.config',
             'target_pose': np.array([0, 1, 1, 0, 1, 1, 0, 1, 1]),
-            'use_mags': True,
+            'obs_keys': ['qp', 'qv', 'mag', 'pose_err']
             # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
         }
 )

@@ -14,7 +14,7 @@ import ipdb
 class DManusBase(env_base.MujocoEnv):
 
     DEFAULT_OBS_KEYS = [
-        'qp', 'qv', 'pose_err'
+        'qp', 'qv', 'mag'
     ]
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
         "reach": -1.0,
@@ -25,34 +25,31 @@ class DManusBase(env_base.MujocoEnv):
     def __init__(self, 
         model_path, 
         config_path, 
-        target_pose, 
-        use_mags=False, **kwargs):
+        obs_keys=DEFAULT_OBS_KEYS,
+        **kwargs):
 
         curr_dir = os.path.dirname(os.path.abspath(__file__))
 
-        self.target_pose = target_pose
-        self.use_mags = use_mags
+        # self.target_pose = target_pose
+        # self.use_mags = use_mags
         
 
         env_base.MujocoEnv.__init__(self,
                                 curr_dir+model_path)
-        self.obs_keys = self.DEFAULT_OBS_KEYS.copy()
+        self.obs_keys = obs_keys
         
-        if use_mags:
-            self.obs_keys.append('mag')            
-            
-            # Find number of magnetometers
-            num_sites = len(self.sim.data.site_xpos)
-            site_names = list(map(self.sim.model.site_id2name, [i for i in range(num_sites)]))
-            self.mag_mask = [True if 'mag' in site_names[i] else False for i in range(num_sites)]
-            self.mag_names = [name for name in site_names if 'mag' in name]
-            
-            self.site_colors = self.sim.model.site_rgba.copy()
-            self.mag_model = ReSkinSim()
-            self.mag_model.load_state_dict(
-                torch.load(curr_dir+'/reskin_files/reskin_sim_weights'))
-            with open(curr_dir + '/reskin_files/model_config.yaml','r') as f:
-                self.mag_model_config = yaml.safe_load(f)
+        # Find number of magnetometers
+        num_sites = len(self.sim.data.site_xpos)
+        site_names = list(map(self.sim.model.site_id2name, [i for i in range(num_sites)]))
+        self.mag_mask = [True if 'mag' in site_names[i] else False for i in range(num_sites)]
+        self.mag_names = [name for name in site_names if 'mag' in name]
+        
+        self.site_colors = self.sim.model.site_rgba.copy()
+        self.mag_model = ReSkinSim()
+        self.mag_model.load_state_dict(
+            torch.load(curr_dir+'/reskin_files/reskin_sim_weights'))
+        with open(curr_dir + '/reskin_files/model_config.yaml','r') as f:
+            self.mag_model_config = yaml.safe_load(f)
         
         self._setup(obs_keys=self.obs_keys,
             weighted_reward_keys = self.DEFAULT_RWD_KEYS_AND_WEIGHTS,
@@ -67,29 +64,8 @@ class DManusBase(env_base.MujocoEnv):
             # rwd_viz = False,
             robot_name = 'dmanus')
     
-    def _setup(self,
-               obs_keys,
-               weighted_reward_keys,
-               reward_mode = "dense",
-               frame_skip = 1,
-               normalize_act = True,
-               obs_range = (-10, 10),
-               seed = None,
-               rwd_viz = False,
-               mag_model_path= None,
-               **kwargs):
-        
-        env_base.MujocoEnv._setup(self, 
-            obs_keys=obs_keys,
-            weighted_reward_keys = weighted_reward_keys,
-            reward_mode = reward_mode,             
-            frame_skip = frame_skip,
-            normalize_act = normalize_act,
-            obs_range = obs_range,
-            seed = seed,
-            rwd_viz = rwd_viz,
-            **kwargs
-        )
+    def _setup(self,**kwargs):
+        env_base.MujocoEnv._setup(self, **kwargs)
 
     def get_obs_dict(self, sim):
         obs_dict = {}
@@ -97,27 +73,9 @@ class DManusBase(env_base.MujocoEnv):
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
         obs_dict['pose_err'] = obs_dict['qp'] - self.target_pose
-        if self.use_mags:
-            obs_dict['mag'] = self.get_mag_obs(sim)
+        obs_dict['mag'] = self.get_mag_obs(sim)
+
         return obs_dict
-
-
-    def get_reward_dict(self, obs_dict):
-        reach_dist = np.linalg.norm(obs_dict['pose_err'], axis=-1)
-        far_th = 10
-
-        rwd_dict = collections.OrderedDict((
-            # Optional Keys
-            ('reach',   reach_dist),
-            ('bonus',   (reach_dist<1) + (reach_dist<2)),
-            ('penalty', (reach_dist>far_th)),
-            # Must keys
-            ('sparse',  -1.0*reach_dist),
-            ('solved',  reach_dist<.5),
-            ('done',    reach_dist > far_th),
-        ))
-        rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
-        return rwd_dict
     
     def get_mag_obs(self, sim):
         '''
