@@ -64,13 +64,19 @@ class DManusBallOnPalmReach(DManusBase):
         model_path,
         config_path,
         obs_keys=DEFAULT_OBS_KEYS,
+        target_xy_range=np.array(([0.0, 0.0], [0.0, 0.0])),
+        ball_xy_range=np.array(([-.05, -.05], [.05, .05])),
         **kwargs):
+
+        self.target_xy_range = target_xy_range
+        self.ball_xy_range = ball_xy_range
 
         DManusBase.__init__(self, model_path,
         config_path,obs_keys,**kwargs)
 
     def _setup(self, **kwargs):
         self.target_sid = self.sim.model.site_name2id('target')
+        self.init_sid = self.sim.model.site_name2id('init_ball')
         DManusBase._setup(self,**kwargs)
 
     def get_obs_dict(self, sim):
@@ -81,22 +87,21 @@ class DManusBallOnPalmReach(DManusBase):
         # obs_dict['qp'] = sim.data.qpos.copy()
         # obs_dict['qv'] = sim.data.qvel.copy()
         
-        obs_dict['joints'] = sim.data.qpos[:11].copy()
-        obs_dict['djoints'] = sim.data.qpos[:11].copy()
-        obs_dict['ball'] = sim.data.qpos[11:14].copy()
-        obs_dict['dball'] = sim.data.qvel[11:14].copy()
-        obs_dict['target'] = sim.data.site_xpos[self.target_sid].copy()
+        obs_dict['joints'] = self.sim.data.qpos[:11].copy()
+        obs_dict['djoints'] = self.sim.data.qpos[:11].copy()
+        obs_dict['ball'] = self.sim.data.qpos[11:14].copy()
+        obs_dict['dball'] = self.sim.data.qvel[11:14].copy()
+        obs_dict['target'] = self.sim.data.site_xpos[self.target_sid].copy()
         # ipdb.set_trace()
         # Change this to only look at target pose for the ball
         obs_dict['target_err'] = obs_dict['ball'] - obs_dict['target']
-        obs_dict['mag'] = self.get_mag_obs(sim)
+        obs_dict['mag'] = self.get_mag_obs(self.sim)
 
         return obs_dict
 
     def get_reward_dict(self, obs_dict):
         reach_dist = np.linalg.norm(obs_dict['target_err'], axis=-1)
-        far_th = 10
-
+        far_th = 0.5
         rwd_dict = collections.OrderedDict((
             # Optional Keys
             ('reach',   reach_dist),
@@ -110,13 +115,16 @@ class DManusBallOnPalmReach(DManusBase):
         rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
         return rwd_dict
     
-    # def reset(self):
-    #     # generate targets
-    #     self.sim.model.site_pos[self.target_sid][:2] = self.np_random.uniform(low=self.target_xy_range[0], high=self.target_xy_range[1])
-    #     self.sim.forward()
+    def reset(self):
+        # generate targets
+        self.sim.model.site_pos[self.target_sid][:2] = self.np_random.uniform(
+            low=self.target_xy_range[0], high=self.target_xy_range[1])
+        self.sim.forward()
 
-    #     # generate object
-    #     qp = self.init_qpos.copy()
-    #     qp[2:4] = self.np_random.uniform(low=self.ball_xy_range[0], high=self.ball_xy_range[1])
-    #     obs = super().reset(reset_qpos=qp)
-    #     return obs
+        # generate object
+        qp = self.init_qpos.copy()
+        qp[2:4] = self.np_random.uniform(
+            low=self.ball_xy_range[0], high=self.ball_xy_range[1])
+        self.sim.model.site_pos[self.init_sid][:2] = qp[2:4]
+        obs = super().reset(reset_qpos=qp)
+        return obs
