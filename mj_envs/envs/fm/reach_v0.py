@@ -70,6 +70,7 @@ class DManusBallOnPalmReach(DManusBase):
 
         self.target_xy_range = target_xy_range
         self.ball_xy_range = ball_xy_range
+        self.last_mag = None
 
         DManusBase.__init__(self, model_path,
         config_path,obs_keys,**kwargs)
@@ -96,6 +97,9 @@ class DManusBallOnPalmReach(DManusBase):
         # Change this to only look at target pose for the ball
         obs_dict['target_err'] = obs_dict['ball'] - obs_dict['target']
         obs_dict['mag'] = self.get_mag_obs(self.sim)
+        if self.last_mag is None:
+            self.last_mag = obs_dict['mag'].copy()
+        obs_dict['magdiff'] = obs_dict['mag'] - self.last_mag
 
         return obs_dict
 
