@@ -4,7 +4,7 @@ import collections
 
 import ipdb
 
-class DManusReachFixed(DManusBase):
+class DManusFixedReach(DManusBase):
     
     DEFAULT_OBS_KEYS = [
         'qp', 'qv', 'mag', 'pose_err'
@@ -51,38 +51,50 @@ class DManusReachFixed(DManusBase):
 
 class DManusBallOnPalmReach(DManusBase):
 
+    DEFAULT_OBS_KEYS = [
+        'joints', 'djoints', 'mag'
+    ]
+    DEFAULT_RWD_KEYS_AND_WEIGHTS = {
+        "reach": -1.0,
+        "bonus": 4.0,
+        "penalty": -50,
+    }
+    
     def __init__(self,
         model_path,
         config_path,
-        target_pose,
-        use_mags=False,
+        obs_keys=DEFAULT_OBS_KEYS,
         **kwargs):
 
-        super().__init__(model_path,
-        config_path,
-        target_pose,
-        use_mags=False,**kwargs)
+        DManusBase.__init__(self, model_path,
+        config_path,obs_keys,**kwargs)
+
+    def _setup(self, **kwargs):
+        self.target_sid = self.sim.model.site_name2id('target')
+        DManusBase._setup(self,**kwargs)
 
     def get_obs_dict(self, sim):
         # Ensure here that the ball's position and velocity are not (or are)
         # in the qp and qv. Appropriately assign obs_keys.
         obs_dict = {}
         obs_dict['t'] = np.array([self.sim.data.time])
-        obs_dict['qp'] = sim.data.qpos.copy()
-        obs_dict['qv'] = sim.data.qvel.copy()
-        obs_dict['joints'] = self.data.qpos[:11].copy()
-        obs_dict['djoints'] = self.data.qpos[:11].copy()
-        obs_dict['ball'] = self.data.qpos[11:14].copy()
-        obs_dict['dball'] = self.data.qvel[11:14].copy()
+        # obs_dict['qp'] = sim.data.qpos.copy()
+        # obs_dict['qv'] = sim.data.qvel.copy()
+        
+        obs_dict['joints'] = sim.data.qpos[:11].copy()
+        obs_dict['djoints'] = sim.data.qpos[:11].copy()
+        obs_dict['ball'] = sim.data.qpos[11:14].copy()
+        obs_dict['dball'] = sim.data.qvel[11:14].copy()
+        obs_dict['target'] = sim.data.site_xpos[self.target_sid].copy()
         # ipdb.set_trace()
         # Change this to only look at target pose for the ball
-        obs_dict['pose_err'] = obs_dict['qp']
-        if self.use_mags:
-            obs_dict['mag'] = self.get_mag_obs(sim)
+        obs_dict['target_err'] = obs_dict['ball'] - obs_dict['target']
+        obs_dict['mag'] = self.get_mag_obs(sim)
+
         return obs_dict
 
     def get_reward_dict(self, obs_dict):
-        reach_dist = np.linalg.norm(obs_dict['pose_err'], axis=-1)
+        reach_dist = np.linalg.norm(obs_dict['target_err'], axis=-1)
         far_th = 10
 
         rwd_dict = collections.OrderedDict((
@@ -97,3 +109,14 @@ class DManusBallOnPalmReach(DManusBase):
         ))
         rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
         return rwd_dict
+    
+    # def reset(self):
+    #     # generate targets
+    #     self.sim.model.site_pos[self.target_sid][:2] = self.np_random.uniform(low=self.target_xy_range[0], high=self.target_xy_range[1])
+    #     self.sim.forward()
+
+    #     # generate object
+    #     qp = self.init_qpos.copy()
+    #     qp[2:4] = self.np_random.uniform(low=self.ball_xy_range[0], high=self.ball_xy_range[1])
+    #     obs = super().reset(reset_qpos=qp)
+    #     return obs

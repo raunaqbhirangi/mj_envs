@@ -28,8 +28,8 @@ register(
 )
 
 register(
-    id='DManusReachFixed-v0',
-    entry_point='mj_envs.envs.fm.reach_v0:DManusReachFixed',
+    id='DManusFixedReach-v0',
+    entry_point='mj_envs.envs.fm.reach_v0:DManusFixedReach',
     max_episode_steps=50, #50steps*40Skip*2ms = 4s
     kwargs={
             'model_path': '/assets/dmanus.xml',
@@ -48,7 +48,6 @@ register(
             'model_path': '/assets/dmanus_wrist/dmanus_wrist.xml',
             'config_path': curr_dir+'/assets/dmanus_wrist/dmanus_wrist.config',
             'target_pose': np.array([0,0,0, 1, 1, 0, 1, 1, 0, 1, 1]),
-            'use_mags': True,
             # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
         }
 )
@@ -60,8 +59,9 @@ register(
     kwargs={
             'model_path': '/assets/dmanus_wrist/dmanus_wrist_with_ball.xml',
             'config_path': curr_dir+'/assets/dmanus_wrist/dmanus_wrist.config',
-            'target_pose': np.array([0,0,0, 1, 1, 0, 1, 1, 0, 1, 1]),
-            'use_mags': True,
+            'obs_keys': ['joints', 'djoints', 'mag'],
+            'target_xy_range': np.array(([0.0, 0.0], [0.0, 0.0])),
+            'ball_xy_range': np.array(([-.05, -.05], [.05, .05])),
             # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
         }
 )
