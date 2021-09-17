@@ -11,6 +11,7 @@ class DManusBallOnPalmReach(DManusBase):
         target_pose,
         use_mags=False,
         **kwargs):
+
         super().__init__(model_path,
         config_path,
         target_pose,
@@ -23,6 +24,10 @@ class DManusBallOnPalmReach(DManusBase):
         obs_dict['t'] = np.array([self.sim.data.time])
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
+        obs_dict['joints'] = self.data.qpos[:11].copy()
+        obs_dict['djoints'] = self.data.qpos[:11].copy()
+        obs_dict['ball'] = self.data.qpos[11:14].copy()
+        obs_dict['dball'] = self.data.qvel[11:14].copy()
         # ipdb.set_trace()
         # Change this to only look at target pose for the ball
         obs_dict['pose_err'] = obs_dict['qp']
