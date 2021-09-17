@@ -105,7 +105,7 @@ class DManusBallOnPalmReach(DManusBase):
 
     def get_reward_dict(self, obs_dict):
         reach_dist = np.linalg.norm(obs_dict['target_err'], axis=-1)
-        far_th = 0.5
+        far_th = 0.25
         rwd_dict = collections.OrderedDict((
             # Optional Keys
             ('reach',   reach_dist),
@@ -127,8 +127,8 @@ class DManusBallOnPalmReach(DManusBase):
 
         # generate object
         qp = self.init_qpos.copy()
-        qp[2:4] = self.np_random.uniform(
+        qp[11:13] = self.np_random.uniform(
             low=self.ball_xy_range[0], high=self.ball_xy_range[1])
-        self.sim.model.site_pos[self.init_sid][:2] = qp[2:4]
+        self.sim.model.site_pos[self.init_sid][:2] = qp[11:13]
         obs = super().reset(reset_qpos=qp)
         return obs
