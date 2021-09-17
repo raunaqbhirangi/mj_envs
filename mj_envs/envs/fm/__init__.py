@@ -55,10 +55,10 @@ register(
 
 register(
     id='DManusBallOnPalmReach-v0',
-    entry_point='mj_envs.envs.fm.reach_v0:DManusBallOnPalmFixed',
+    entry_point='mj_envs.envs.fm.reach_v0:DManusBallOnPalmReach',
     max_episode_steps=50, #50steps*40Skip*2ms = 4s
     kwargs={
-            'model_path': '/assets/dmanus_wrist/dmanus_wrist.xml',
+            'model_path': '/assets/dmanus_wrist/dmanus_wrist_with_ball.xml',
             'config_path': curr_dir+'/assets/dmanus_wrist/dmanus_wrist.config',
             'target_pose': np.array([0,0,0, 1, 1, 0, 1, 1, 0, 1, 1]),
             'use_mags': True,

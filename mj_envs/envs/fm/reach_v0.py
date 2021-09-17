@@ -2,6 +2,7 @@ from mj_envs.envs.fm.base_v0 import DManusBase
 import numpy as np
 import collections
 
+import ipdb
 class DManusBallOnPalmReach(DManusBase):
 
     def __init__(self,
@@ -10,7 +11,10 @@ class DManusBallOnPalmReach(DManusBase):
         target_pose,
         use_mags=False,
         **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(model_path,
+        config_path,
+        target_pose,
+        use_mags=False,**kwargs)
 
     def get_obs_dict(self, sim):
         # Ensure here that the ball's position and velocity are not (or are)
@@ -19,9 +23,9 @@ class DManusBallOnPalmReach(DManusBase):
         obs_dict['t'] = np.array([self.sim.data.time])
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
-            
+        # ipdb.set_trace()
         # Change this to only look at target pose for the ball
-        obs_dict['pose_err'] = obs_dict['qp'] - self.target_pose
+        obs_dict['pose_err'] = obs_dict['qp']
         if self.use_mags:
             obs_dict['mag'] = self.get_mag_obs(sim)
         return obs_dict

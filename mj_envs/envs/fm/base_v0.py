@@ -54,8 +54,8 @@ class DManusBase(env_base.MujocoEnv):
             with open(curr_dir + '/reskin_files/model_config.yaml','r') as f:
                 self.mag_model_config = yaml.safe_load(f)
         
-        self._setup(obs_keys=self.DEFAULT_OBS_KEYS,
-            weighted_reward_keys = self.obs_keys,
+        self._setup(obs_keys=self.obs_keys,
+            weighted_reward_keys = self.DEFAULT_RWD_KEYS_AND_WEIGHTS,
             reward_mode = "dense",             
             frame_skip = 40,
             normalize_act = True,
