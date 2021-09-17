@@ -2,7 +2,7 @@ from mj_envs.envs.fm.base_v0 import DManusBase
 import numpy as np
 import collections
 
-class DManusBallOnPalmReachEnvV0(DManusBase):
+class DManusBallOnPalmReach(DManusBase):
 
     def __init__(self,
         model_path,
