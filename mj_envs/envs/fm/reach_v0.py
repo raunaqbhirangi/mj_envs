@@ -57,7 +57,7 @@ class DManusBallOnPalmReach(DManusBase):
     DEFAULT_RWD_KEYS_AND_WEIGHTS = {
         "reach": -1.0,
         "bonus": 4.0,
-        "penalty": -50,
+        "penalty": -20.,
     }
     
     def __init__(self,
@@ -105,11 +105,11 @@ class DManusBallOnPalmReach(DManusBase):
         rwd_dict = collections.OrderedDict((
             # Optional Keys
             ('reach',   reach_dist),
-            ('bonus',   (reach_dist<1) + (reach_dist<2)),
+            ('bonus',   (reach_dist<.03) + (reach_dist<.06)),
             ('penalty', (reach_dist>far_th)),
             # Must keys
             ('sparse',  -1.0*reach_dist),
-            ('solved',  reach_dist<.5),
+            ('solved',  reach_dist<.01),
             ('done',    reach_dist > far_th),
         ))
         rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
