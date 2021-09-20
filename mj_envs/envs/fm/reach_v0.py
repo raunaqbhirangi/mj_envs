@@ -93,13 +93,13 @@ class DManusBallOnPalmReach(DManusBase):
         obs_dict['joints'] = self.sim.data.qpos[:11].copy()
         obs_dict['djoints'] = self.sim.data.qpos[:11].copy() * self.dt
         obs_dict['ball'] = self.sim.data.qpos[11:14].copy()
-        obs_dict['dball'] = self.sim.data.qvel[11:14].copy()
+        obs_dict['dball'] = self.sim.data.qvel[11:14].copy() * self.dt
         obs_dict['target'] = self.sim.data.site_xpos[self.target_sid].copy()
         # ipdb.set_trace()
         # Change this to only look at target pose for the ball
         obs_dict['target_err'] = obs_dict['ball'] - obs_dict['target']
         obs_dict['mag'] = self.get_mag_obs(self.sim)
-        print(self.sim.model.site_pos[self.target_sid], self.sim.data.site_xpos[self.target_sid], obs_dict['target'])
+
         if self.last_mag is None:
             self.last_mag = obs_dict['mag'].copy()
         obs_dict['magdiff'] = obs_dict['mag'] - self.last_mag
