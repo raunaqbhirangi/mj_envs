@@ -60,8 +60,8 @@ register(
             'model_path': '/assets/dmanus_wrist/dmanus_wrist_with_ball.xml',
             'config_path': curr_dir+'/assets/dmanus_wrist/dmanus_wrist.config',
             'obs_keys': ['joints', 'djoints', 'mag', 'magdiff'],
-            'target_xy_range': np.array(([0.0, -0.05], [0.0, -0.05])),
-            'ball_xy_range': np.array(([-.05, -0.1], [.05, 0.0])),
+            'target_xy_range': np.array(([0.0, 0.05], [0.0, 0.05])),
+            'ball_xy_range': np.array(([-0.05, 0.0], [0.05, 0.1])),
             # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
         }
 )

@@ -10,11 +10,11 @@
         <body name="stand" pos="0 -0.2 0.05" euler="-1.57 0 0">
             <include file="./dmanus_wrist_chain.xml"/>
         </body>
-        <site name='target' pos='0 0.0 0.095' rgba='0 1 0 .2' size='0.016'/>
-        <site name='init_ball' pos='0.05 0.0 .095' rgba='1 0 0 .2' size='0.016'/>
+        
+        
         <body name='ball' pos='0 0 .095'>
             <geom type='sphere' size='0.015' rgba='.95 .95 .8 1'/>
-            <freejoint/>>
+            <freejoint/>
         </body>
     </worldbody>
 
