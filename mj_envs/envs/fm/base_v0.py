@@ -156,14 +156,15 @@ class DManusBase(env_base.MujocoEnv):
         curr_scaling_mm = self.mag_model_config['input_std']*0.001
         new_scaling = mag_thres/np.sqrt(2)
         magout = np.zeros((len(contact_location_xy),3))
-        scaled_loc = torch.tensor(contact_location_xy/new_scaling, dtype=torch.float)
+        if np.sum(mags_in_range) > 0:
+            scaled_loc = torch.tensor(contact_location_xy/new_scaling, dtype=torch.float)
 
-        with torch.no_grad():
-            magdist = self.mag_model(scaled_loc)
-            magdist = magdist[mags_in_range]
-        magout[mags_in_range] = torch.distributions.normal.Normal(
-            magdist[...,:3], torch.exp(magdist[...,3:])).sample()
-        # magout[mags_in_range] = magdist[...,:3]
+            with torch.no_grad():
+                magdist = self.mag_model(scaled_loc)
+                magdist = magdist[mags_in_range]
+            magout[mags_in_range] = torch.distributions.normal.Normal(
+                magdist[...,:3], torch.exp(magdist[...,3:])).sample()
+            # magout[mags_in_range] = magdist[...,:3]
 
         return magout
 
