@@ -65,3 +65,17 @@ register(
             # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
         }
 )
+
+register(
+    id='DManusBallOnPalmReachOracle-v0',
+    entry_point='mj_envs.envs.fm.reach_v0:DManusBallOnPalmReach',
+    max_episode_steps=50, #50steps*40Skip*2ms = 4s
+    kwargs={
+            'model_path': '/assets/dmanus_wrist/dmanus_wrist_with_ball.xml',
+            'config_path': curr_dir+'/assets/dmanus_wrist/dmanus_wrist.config',
+            'obs_keys': ['joints', 'djoints', 'ball', 'dball'],
+            'target_xy_range': np.array(([0.0, 0.05], [0.0, 0.05])),
+            'ball_xy_range': np.array(([-0.05, 0.0], [0.05, 0.1])),
+            # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
+        }
+)
