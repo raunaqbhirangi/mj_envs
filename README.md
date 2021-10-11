@@ -6,7 +6,7 @@
 
 1. Clone this repo with pre-populated submodule dependencies
 ```
-$ git clone --recursive https://github.com/vikashplus/mj_envs.git
+$ git clone --recursive https://github.com/raunaqbhirangi/mj_envs.git
 ```
 2. Update submodules
 ```
@@ -24,7 +24,7 @@ export PYTHONPATH="<path/to/mj_envs>:$PYTHONPATH"
 ```
 4. You can visualize the environments with random controls using the below command
 ```
-$ python utils/visualize_env.py --env_name hammer-v0
+$ python mj_envs/utils/visualize_env.py --env_name hammer-v0
 ```
 **NOTE:** If the visualization results in a GLFW error, this is because `mujoco-py` does not see some graphics drivers correctly. This can usually be fixed by explicitly loading the correct drivers before running the python script. See [this page](https://github.com/aravindr93/mjrl/tree/master/setup#known-issues) for details.
 
