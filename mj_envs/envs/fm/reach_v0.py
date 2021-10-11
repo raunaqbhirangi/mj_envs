@@ -103,7 +103,6 @@ class DManusBallOnPalmReach(DManusBase):
         if self.last_mag is None:
             self.last_mag = obs_dict['mag'].copy()
         obs_dict['magdiff'] = obs_dict['mag'] - self.last_mag
-
         return obs_dict
 
     def get_reward_dict(self, obs_dict):
@@ -135,18 +134,22 @@ class DManusBallOnPalmReach(DManusBase):
         #     low=self.ball_xy_range[0], high=self.ball_xy_range[1])
         # self.sim.model.site_pos[self.init_sid][:2] = qp[11:13]
         
-        # If target and init_pos are in the palm frame, this should work
+
+        # reset hand
+
+        self.sim.data.qpos[:] = self.init_qpos.copy()
+        self.sim.forward()
+
+        # Reset init and target sites
         self.sim.model.site_pos[self.target_sid][::2] = self.np_random.uniform(
             low=self.target_xy_range[0], high=self.target_xy_range[1])
         self.sim.model.site_pos[self.init_sid][::2] = self.np_random.uniform(
             low=self.ball_xy_range[0], high=self.ball_xy_range[1])
         self.sim.forward()
 
+        # move the ball to the init_site
         qp = self.init_qpos.copy()
-
-        # body_id = self.sim.model.site_bodyid[self.init_sid]
-        # qp[11:14] = self.sim.data.body_xpos[body_id] + self.sim.data.body_xmat[body_id].reshape((3,3)) @ self.sim.model.site_pos[self.init_sid]
-        
         qp[11:14] = self.sim.data.site_xpos[self.init_sid]
+
         obs = super().reset(reset_qpos=qp)
         return obs
