@@ -115,7 +115,7 @@ class DManusBallOnPalmReach(DManusBase):
             ('penalty', (reach_dist>far_th)),
             # Must keys
             ('sparse',  -1.0*reach_dist),
-            ('solved',  reach_dist<.02),
+            ('solved',  reach_dist<.03),
             ('done',    reach_dist > far_th),
         ))
         rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
