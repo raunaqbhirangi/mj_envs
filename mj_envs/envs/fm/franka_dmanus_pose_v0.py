@@ -72,7 +72,6 @@ class FrankaDmanusPose(env_base.MujocoEnv):
                obs_keys=DEFAULT_OBS_KEYS,
                weighted_reward_keys=DEFAULT_RWD_KEYS_AND_WEIGHTS,
                **kwargs):
-
         if isinstance(target_pose,np.ndarray):
             self.target_type = 'fixed'
             self.target_pose = target_pose
@@ -121,4 +120,91 @@ class FrankaDmanusPose(env_base.MujocoEnv):
     def reset(self):
         self.target_pose = self.get_target_pose()
         obs = super().reset(self.init_qpos, self.init_qvel)
+        return obs
+
+class FrankaDmanusPoseWithBall(FrankaDmanusPose):
+    DEFAULT_OBS_KEYS = [
+        'qp', 'qv', 'target_err', 'ball', 'dball' 
+    ]
+    DEFAULT_RWD_KEYS_AND_WEIGHTS = {
+        # "pose": -1.0,
+        "bonus": 4.0,
+        "penalty": -50,
+    }
+    def __init__(self, model_path, obsd_model_path=None, seed=None, **kwargs):
+        super().__init__(model_path, obsd_model_path, seed, **kwargs)
+    
+    def _setup(self,
+               target_ball_pos,
+               obs_keys=DEFAULT_OBS_KEYS,
+               weighted_reward_keys=DEFAULT_RWD_KEYS_AND_WEIGHTS,
+               **kwargs):
+        
+        self.target_sid = self.sim.model.site_name2id('target')
+        self.init_sid = self.sim.model.site_name2id('init_ball')
+
+        self.palm_id = self.sim.model.site_bodyid[self.init_sid]
+
+        if isinstance(target_ball_pos,np.ndarray):
+            self.target_type = 'fixed'
+            self.target_ball_pos = target_ball_pos
+        elif target_ball_pos == 'random':
+            self.target_type = 'random'
+            self.target_ball_pos = self.sim.data.qpos.copy() # fake target for setup
+
+        env_base.MujocoEnv._setup(self, obs_keys=obs_keys,
+                       weighted_reward_keys=weighted_reward_keys,
+                       frame_skip=40,
+                       **kwargs)
+
+    def get_obs_dict(self, sim):
+        obs_dict = {}
+        obs_dict['t'] = np.array([self.sim.data.time])
+        obs_dict['qp'] = sim.data.qpos.copy()
+        obs_dict['qv'] = sim.data.qvel.copy()
+        # Add magnetometer measurements here
+
+        obs_dict['ball'] = self.sim.data.qpos[11:14].copy()
+        obs_dict['dball'] = self.sim.data.qvel[11:14].copy() * self.dt
+        obs_dict['target'] = self.sim.data.site_xpos[self.target_sid].copy()
+        # ipdb.set_trace()
+        # Change this to only look at target pose for the ball
+        obs_dict['target_err'] = obs_dict['ball'] - obs_dict['target']
+
+        # Add code for mags and magdiffs
+        return obs_dict
+
+    def get_reward_dict(self, obs_dict):
+        # TODO: Add rewards for ball balancing here
+        reach_dist = np.linalg.norm(obs_dict['target_err'], axis=-1)
+        far_th = 0.25
+        rwd_dict = collections.OrderedDict((
+            # Optional Keys
+            ('reach',   reach_dist),
+            ('bonus',   (reach_dist<.035) + (reach_dist<.07)),
+            ('penalty', (reach_dist>far_th)),
+            # Must keys
+            ('sparse',  -1.0*reach_dist),
+            ('solved',  reach_dist<.03),
+            ('done',    reach_dist > far_th),
+        ))
+        rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
+        return rwd_dict
+
+    def reset(self):
+        self.sim.data.qpos[:] = self.init_qpos.copy()
+        self.sim.forward()
+
+        # Reset init and target sites
+        self.sim.model.site_pos[self.target_sid][::2] = self.np_random.uniform(
+            low=self.target_xy_range[0], high=self.target_xy_range[1])
+        self.sim.model.site_pos[self.init_sid][::2] = self.np_random.uniform(
+            low=self.ball_xy_range[0], high=self.ball_xy_range[1])
+        self.sim.forward()
+
+        # move the ball to the init_site
+        qp = self.init_qpos.copy()
+        qp[11:14] = self.sim.data.site_xpos[self.init_sid]
+
+        obs = super().reset(reset_qpos=qp)
         return obs

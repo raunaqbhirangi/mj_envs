@@ -38,3 +38,35 @@ register(
             'target_pose': 'random'
         }
 )
+
+# Ball random target from oracle info
+register(
+    id='rpFrankaDManusBallBalanceOracle-v0',
+    entry_point='mj_envs.envs.fm.franka_dmanus_pose_v0:FrankaDmanusPoseWithBall',
+    max_episode_steps=50, #50steps*40Skip*2ms = 4s
+    kwargs={
+            'model_path': '/assets/franka_dmanus_ball.xml',
+            'config_path': os.path.join(curr_dir,'assets/franka_dmanus.config'),
+            'obs_keys': ['qp', 'qv', 'ball', 'dball'],
+            'target_xy_range': np.array(([0.0, 0.05], [0.0, 0.05])),
+            'ball_xy_range': np.array(([-0.05, 0.0], [0.05, 0.1])),
+            'target_ball_pos': 'random',
+            # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
+        }
+)
+
+# Ball to random target from reskin data
+register(
+    id='rpFrankaDManusBallBalance-v0',
+    entry_point='mj_envs.envs.fm.franka_dmanus_pose_v0:FrankaDmanusPoseWithBall',
+    max_episode_steps=50, #50steps*40Skip*2ms = 4s
+    kwargs={
+            'model_path': '/assets/franka_dmanus_ball.xml',
+            'config_path': os.path.join(curr_dir,'assets/franka_dmanus.config'),
+            'obs_keys': ['qp', 'qv', 'mag', 'dmag'],
+            'target_xy_range': np.array(([0.0, 0.05], [0.0, 0.05])),
+            'ball_xy_range': np.array(([-0.05, 0.0], [0.05, 0.1])),
+            'target_ball_pos': 'random',
+            # 'mag_model_path': curr_dir+'/reskin_files/model.pt'
+        }
+)

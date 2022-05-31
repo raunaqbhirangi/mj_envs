@@ -18,7 +18,7 @@ from mj_envs.robot.robot import Robot
 from os import path
 import skvideo.io
 
-from r3m import load_r3m
+# from r3m import load_r3m
 
 # TODO
 # remove rwd_mode
