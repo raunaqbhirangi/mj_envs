@@ -105,11 +105,11 @@ class MujocoEnv(gym.Env, gym.utils.EzPickle, ObsVecDict):
                            random_generator=self.np_random,
                            **kwargs)
 
-        #resolve action space
+        # resolve action space
         self.frame_skip = frame_skip
         self.normalize_act = normalize_act
-        act_low = -np.ones(self.sim.model.nu) if self.normalize_act else self.sim.model.actuator_ctrlrange[:,0].copy()
-        act_high = np.ones(self.sim.model.nu) if self.normalize_act else self.sim.model.actuator_ctrlrange[:,1].copy()
+        act_low = -np.ones(self.sim.model.nu) if self.normalize_act else self.sim.model.actuator_ctrlrange[:, 0].copy()
+        act_high = np.ones(self.sim.model.nu) if self.normalize_act else self.sim.model.actuator_ctrlrange[:, 1].copy()
         self.action_space = gym.spaces.Box(act_low, act_high, dtype=np.float32)
 
         # resolve initial state
@@ -118,7 +118,7 @@ class MujocoEnv(gym.Env, gym.utils.EzPickle, ObsVecDict):
         # self.init_qpos = np.mean(self.sim.model.actuator_ctrlrange, axis=1) if self.normalize_act else self.sim.data.qpos.ravel().copy() # has issues when nq!=nu
         # self.init_qpos[self.sim.model.jnt_dofadr] = np.mean(self.sim.model.jnt_range, axis=1) if self.normalize_act else self.sim.data.qpos.ravel().copy()
         if self.normalize_act:
-            linear_jnt_qposids = self.sim.model.jnt_qposadr[self.sim.model.jnt_type>1] #hinge and slides
+            linear_jnt_qposids = self.sim.model.jnt_qposadr[self.sim.model.jnt_type > 1] #hinge and slides
             linear_jnt_ids = self.sim.model.jnt_type>1
             self.init_qpos[linear_jnt_qposids] = np.mean(self.sim.model.jnt_range[linear_jnt_ids], axis=1)
 

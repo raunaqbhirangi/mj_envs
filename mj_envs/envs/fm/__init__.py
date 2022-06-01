@@ -48,6 +48,7 @@ register(
             'model_path': '/assets/franka_dmanus_ball.xml',
             'config_path': os.path.join(curr_dir,'assets/franka_dmanus.config'),
             'obs_keys': ['qp', 'qv', 'ball', 'dball'],
+            'franka_init': np.array([0.0, 0.9795, 0.0, -0.6556, 1.4633, 0.2593, 0.0]),
             'target_xy_range': np.array(([0.0, 0.05], [0.0, 0.05])),
             'ball_xy_range': np.array(([-0.05, 0.0], [0.05, 0.1])),
             'target_ball_pos': 'random',

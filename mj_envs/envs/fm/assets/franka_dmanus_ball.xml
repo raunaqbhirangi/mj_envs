@@ -43,9 +43,8 @@
             <include file="../../../sims/dmanus_sim/assets/dmanus_skin_chain.xml"/>
         </body>
 
-        <body name='ball' pos='0 0 .095'>
-            <!-- <geom type='sphere' size='0.015' rgba='.95 .95 .8 1'/> -->
-            <geom type='sphere' size='0.015' rgba='.95 .95 .8 1' group="4"/>
+        <body name='ball' pos='-0.15 0.86 1.3408'>
+            <geom type='sphere' size='.015' rgba='1 1 1 1' group="3"/>
             <freejoint/>
         </body>
     </worldbody>
