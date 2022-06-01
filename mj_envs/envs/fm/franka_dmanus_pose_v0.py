@@ -131,14 +131,20 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         "bonus": 4.0,
         "penalty": -50,
     }
-    def __init__(self, model_path, obsd_model_path=None, seed=None, **kwargs):
+    def __init__(self, model_path, target_xy_range, ball_xy_range, obsd_model_path=None, seed=None, **kwargs):
+
+        self.target_xy_range = target_xy_range
+        self.ball_xy_range = ball_xy_range
+
         super().__init__(model_path, obsd_model_path, seed, **kwargs)
     
     def _setup(self,
                target_ball_pos,
+               franka_init=None,
                obs_keys=DEFAULT_OBS_KEYS,
                weighted_reward_keys=DEFAULT_RWD_KEYS_AND_WEIGHTS,
-               **kwargs):
+               **kwargs
+        ):
         
         self.target_sid = self.sim.model.site_name2id('target')
         self.init_sid = self.sim.model.site_name2id('init_ball')
@@ -150,12 +156,18 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
             self.target_ball_pos = target_ball_pos
         elif target_ball_pos == 'random':
             self.target_type = 'random'
-            self.target_ball_pos = self.sim.data.qpos.copy() # fake target for setup
+            self.target_ball_pos = self.sim.data.qpos[16:19].copy() # fake target for setup
+        
 
         env_base.MujocoEnv._setup(self, obs_keys=obs_keys,
                        weighted_reward_keys=weighted_reward_keys,
                        frame_skip=40,
                        **kwargs)
+        
+        if franka_init is not None:
+            # self.sim.data.qpos[:7] = franka_init
+            self.init_qpos[:7] = franka_init
+            print('used franka-init', franka_init)
 
     def get_obs_dict(self, sim):
         obs_dict = {}
@@ -163,14 +175,15 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
         # Add magnetometer measurements here
-
-        obs_dict['ball'] = self.sim.data.qpos[11:14].copy()
-        obs_dict['dball'] = self.sim.data.qvel[11:14].copy() * self.dt
+        # print(len(self.sim.data.qpos))
+        obs_dict['ball'] = self.sim.data.qpos[16:19].copy()
+        obs_dict['dball'] = self.sim.data.qvel[16:19].copy() * self.dt
         obs_dict['target'] = self.sim.data.site_xpos[self.target_sid].copy()
+        # import ipdb; ipdb.set_trace()
         # ipdb.set_trace()
         # Change this to only look at target pose for the ball
-        obs_dict['target_err'] = obs_dict['ball'] - obs_dict['target']
-
+        obs_dict['target_err'] = obs_dict['ball'] - self.target_ball_pos
+        # print(obs_dict['ball'])
         # Add code for mags and magdiffs
         return obs_dict
 
@@ -178,6 +191,7 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         # TODO: Add rewards for ball balancing here
         reach_dist = np.linalg.norm(obs_dict['target_err'], axis=-1)
         far_th = 0.25
+        # print(f'Reach dist: {reach_dist}, far_th: {far_th}')
         rwd_dict = collections.OrderedDict((
             # Optional Keys
             ('reach',   reach_dist),
@@ -186,15 +200,19 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
             # Must keys
             ('sparse',  -1.0*reach_dist),
             ('solved',  reach_dist<.03),
-            ('done',    reach_dist > far_th),
+            ('done',    False),
+            # ('done',    reach_dist > far_th),
         ))
         rwd_dict['dense'] = np.sum([wt*rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
         return rwd_dict
 
     def reset(self):
+        print('Resetting')
+        print(self.init_qpos)
+        
         self.sim.data.qpos[:] = self.init_qpos.copy()
         self.sim.forward()
-
+        print(self.sim.data.site_xpos[self.init_sid])
         # Reset init and target sites
         self.sim.model.site_pos[self.target_sid][::2] = self.np_random.uniform(
             low=self.target_xy_range[0], high=self.target_xy_range[1])
@@ -204,7 +222,7 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
 
         # move the ball to the init_site
         qp = self.init_qpos.copy()
-        qp[11:14] = self.sim.data.site_xpos[self.init_sid]
+        qp[16:19] = self.sim.data.site_xpos[self.init_sid]
 
-        obs = super().reset(reset_qpos=qp)
+        obs = env_base.MujocoEnv.reset(self,reset_qpos=qp)
         return obs
