@@ -43,12 +43,13 @@ register(
 register(
     id='rpFrankaDManusBallBalanceOracle-v0',
     entry_point='mj_envs.envs.fm.franka_dmanus_pose_v0:FrankaDmanusPoseWithBall',
-    max_episode_steps=50, #50steps*40Skip*2ms = 4s
+    max_episode_steps=100, #50steps*40Skip*2ms = 4s
+    # Franka init specifies the reset joint angles
     kwargs={
             'model_path': '/assets/franka_dmanus_ball.xml',
             'config_path': os.path.join(curr_dir,'assets/franka_dmanus.config'),
             'obs_keys': ['qp', 'qv', 'ball', 'dball'],
-            'franka_init': np.array([0.0, 0.9795, 0.0, -0.6556, 1.4633, 0.2593, 0.0]),
+            'franka_init': np.array([-0.0005, 0.9809, 0.1050, -0.5971, 1.4641, 0.2593, 0.0022]),
             'target_xy_range': np.array(([0.0, 0.05], [0.0, 0.05])),
             'ball_xy_range': np.array(([-0.05, 0.0], [0.05, 0.1])),
             'target_ball_pos': 'random',
