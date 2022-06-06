@@ -167,23 +167,22 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         if franka_init is not None:
             # self.sim.data.qpos[:7] = franka_init
             self.init_qpos[:7] = franka_init
-            print('used franka-init', franka_init)
+            # print('used franka-init', franka_init)
 
     def get_obs_dict(self, sim):
         obs_dict = {}
         obs_dict['t'] = np.array([self.sim.data.time])
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
+        
         # Add magnetometer measurements here
-        # print(len(self.sim.data.qpos))
         obs_dict['ball'] = self.sim.data.qpos[16:19].copy()
         obs_dict['dball'] = self.sim.data.qvel[16:19].copy() * self.dt
         obs_dict['target'] = self.sim.data.site_xpos[self.target_sid].copy()
-        # import ipdb; ipdb.set_trace()
-        # ipdb.set_trace()
+        
         # Change this to only look at target pose for the ball
         obs_dict['target_err'] = obs_dict['ball'] - self.target_ball_pos
-        # print(obs_dict['ball'])
+        
         # Add code for mags and magdiffs
         return obs_dict
 
@@ -207,12 +206,9 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         return rwd_dict
 
     def reset(self):
-        print('Resetting')
-        print(self.init_qpos)
-        
         self.sim.data.qpos[:] = self.init_qpos.copy()
         self.sim.forward()
-        print(self.sim.data.site_xpos[self.init_sid])
+        
         # Reset init and target sites
         self.sim.model.site_pos[self.target_sid][::2] = self.np_random.uniform(
             low=self.target_xy_range[0], high=self.target_xy_range[1])
