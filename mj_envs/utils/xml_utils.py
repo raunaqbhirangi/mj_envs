@@ -9,7 +9,8 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import sys
 
-def parse_xml_with_comments(xml_path: str=None, xml_str: str=None):
+
+def parse_xml_with_comments(xml_path: str = None, xml_str: str = None):
     """
     Parse XML while preserving comments.
         Input:
@@ -21,13 +22,14 @@ def parse_xml_with_comments(xml_path: str=None, xml_str: str=None):
     if xml_str:
         tree = ET.ElementTree(ET.fromstring(xml_str))
     elif xml_path:
-        if sys.version_info[0]+0.1*sys.version_info[1]< 3.8:
+        if sys.version_info[0] + 0.1 * sys.version_info[1] < 3.8:
             # python version < 3.8: Create a custom parser
             class CommentedTreeBuilder(ET.TreeBuilder):
                 def comment(self, data):
                     self.start(ET.Comment, {})
                     self.data(data)
                     self.end(ET.Comment)
+
             tree = ET.parse(xml_path, parser=ET.XMLParser(target=CommentedTreeBuilder()))
         else:
             # python version >= 3.8: Use default parser with corrent configuration
@@ -39,8 +41,8 @@ def parse_xml_with_comments(xml_path: str=None, xml_str: str=None):
     return tree
 
 
-def get_xml_str(tree: ET.ElementTree=None,
-                node:ET.Element=None,
+def get_xml_str(tree: ET.ElementTree = None,
+                node: ET.Element = None,
                 pretty=False):
     """
     Serealize tree/ node into string
@@ -59,7 +61,7 @@ def get_xml_str(tree: ET.ElementTree=None,
         node.tail = ""
         node.text = ""
         for elem in node.iter():
-            elem.tail=""
+            elem.tail = ""
             if elem.tag != ET.Comment:
                 elem.text = ""
         xmlstr = ET.tostring(node, encoding='unicode', method='xml')
@@ -67,14 +69,14 @@ def get_xml_str(tree: ET.ElementTree=None,
     else:
         xmlstr = ET.tostring(node, encoding='unicode', method='xml')
 
-    return(xmlstr)
+    return (xmlstr)
 
 
-def merge_xmls( receiver_xml:str,
-                donor_xml:str,
-                receiver_node=None,
-                donor_node=None,
-                destination="str"):
+def merge_xmls(receiver_xml: str,
+               donor_xml: str,
+               receiver_node=None,
+               donor_node=None,
+               destination="str"):
     """
     Merge XMLs preserving MuJoCo structure
         Input:
@@ -101,8 +103,9 @@ def merge_xmls( receiver_xml:str,
     elif destination == "tree":
         return receiver_tree
 
-def reassign_parent( xml_path: str=None,
-                    xml_str: str=None,
+
+def reassign_parent(xml_path: str = None,
+                    xml_str: str = None,
                     receiver_node=None,
                     donor_node=None,
                     destination="str"):
@@ -134,6 +137,38 @@ def reassign_parent( xml_path: str=None,
     # move child
     parent_elem.append(child_elem)
     child_parent_elem.remove(child_elem)
+
+    if destination == "str":
+        return get_xml_str(xml_tree)
+    elif destination == "tree":
+        return xml_tree
+
+
+def remove_joint(xml_path: str = None,
+                 xml_str: str = None,
+                 joint_name: str = None,
+                 destination="str"):
+    xml_tree = parse_xml_with_comments(xml_path=xml_path, xml_str=xml_str)
+    joint_elem = xml_tree.find(".//joint[@name='{}']".format(joint_name))
+    # print(joint_elem.attrib)
+    # import ipdb; ipdb.set_trace()
+    assert joint_elem is not None, "Joint node:{} not found".format(joint_name)
+
+    joint_parent_elem = xml_tree.find(".//joint[@name='{}']...".format(joint_name))
+
+    # Check for actuator and sensor
+    actuator_elems = xml_tree.findall(".//actuator/*[@joint='{}']".format(joint_name))
+    actuator_parent_elem = xml_tree.find(".//actuator/general[@joint='{}']...".format(joint_name))
+    for a_elem in actuator_elems:
+        actuator_parent_elem.remove(a_elem)
+
+    sensor_elems = xml_tree.findall(".//sensor/*[@joint='{}']".format(joint_name))
+    sensor_parent_elem = xml_tree.find(".//sensor".format(joint_name))
+    for s_elem in sensor_elems:
+        sensor_parent_elem.remove(s_elem)
+
+    # Remove joint and actuator
+    joint_parent_elem.remove(joint_elem)
 
     if destination == "str":
         return get_xml_str(xml_tree)
