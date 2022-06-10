@@ -132,10 +132,11 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         "penalty": -50,
     }
 
-    def __init__(self, model_path, target_xy_range, ball_xy_range, obsd_model_path=None, seed=None, **kwargs):
+    def __init__(self, model_path, removed_joint_ids, target_xy_range, ball_xy_range, obsd_model_path=None, seed=None, **kwargs):
 
         self.target_xy_range = target_xy_range
         self.ball_xy_range = ball_xy_range
+        self.removed_joint_ids = removed_joint_ids
 
         self.franka_njoints = 7
         self.dmanus_njoints = 9
@@ -166,11 +167,19 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
                                   weighted_reward_keys=weighted_reward_keys,
                                   frame_skip=40,
                                   **kwargs)
-
         if franka_init is not None:
-            # self.sim.data.qpos[:7] = franka_init
             self.init_qpos[:7] = franka_init
-            # print('used franka-init', franka_init)
+
+        # Make changes for new action space
+
+        self.action_mask = np.ones_like(self.action_space.low, dtype=bool)
+        self.action_mask[self.removed_joint_ids] = 0
+        act_space_low = self.action_space.low[self.action_mask]
+        act_space_high = self.action_space.high[self.action_mask]
+        self.action_space = gym.spaces.Box(act_space_low, act_space_high, dtype=np.float32)
+
+        init_robot_qpos = self.init_qpos[:self.franka_njoints + self.dmanus_njoints]
+        self.init_robot_action = self.robot.normalize_actions(init_robot_qpos)
 
     def get_obs_dict(self, sim):
         obs_dict = {}
@@ -226,49 +235,34 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         obs = env_base.MujocoEnv.reset(self, reset_qpos=qp)
         return obs
 
+    def step(self, a):
+        """
+        Step the simulation forward (t => t+1)
+        Uses robot interface to safely step the forward respecting pos/ vel limits
+        """
+        if not hasattr(self, 'action_mask'):
+            return super().step(a)
+        a = np.clip(a, self.action_space.low, self.action_space.high)
+        extended_a = self.init_robot_action.copy()
+        extended_a[self.action_mask] = a
+        self.last_ctrl = self.robot.step(ctrl_desired=extended_a,
+                                        ctrl_normalized=self.normalize_act,
+                                        step_duration=self.dt,
+                                        realTimeSim=self.mujoco_render_frames,
+                                        render_cbk=self.mj_render if self.mujoco_render_frames else None)
 
-class FrankaDmanusPoseWithBallJointsRemoved(FrankaDmanusPoseWithBall):
-    DEFAULT_OBS_KEYS = [
-        'qp', 'qv', 'target_err', 'ball', 'dball'
-    ]
-    DEFAULT_RWD_KEYS_AND_WEIGHTS = {
-        # "pose": -1.0,
-        "bonus": 4.0,
-        "penalty": -50,
-    }
+        # observation
+        obs = self.get_obs()
 
-    def __init__(self, model_path, config_path, removed_joint_ids, target_xy_range, ball_xy_range, obsd_model_path=None,
-                 seed=None, **kwargs):
-        curr_dir = os.path.dirname(os.path.abspath(__file__))
+        # rewards
+        self.expand_dims(self.obs_dict) # required for vectorized rewards calculations
+        self.rwd_dict = self.get_reward_dict(self.obs_dict)
+        self.squeeze_dims(self.rwd_dict)
+        self.squeeze_dims(self.obs_dict)
 
-        if removed_joint_ids:
-            raw_sim = env_base.get_sim(model_path=curr_dir + model_path)
-            raw_xml = raw_sim.model.get_xml()
+        # finalize step
+        env_info = self.get_env_infos()
 
-            with open(config_path, 'r') as f:
-                robot_config = eval(f.read())
-            for joint_id in removed_joint_ids:
-                joint_name = f'panda0_joint{joint_id}'
-                sensor_name = f'fr_arm_jp{joint_id}'
+        # returns obs(t+1), rew(t), done(t), info(t+1)
+        return obs, env_info['rwd_'+self.rwd_mode], bool(env_info['done']), env_info
 
-                raw_xml = remove_joint(xml_str=raw_xml, joint_name=joint_name)
-
-                # import ipdb; ipdb.set_trace()
-                for sensor in robot_config['franka']['sensor']:
-                    if sensor['name'] == sensor_name:
-                        robot_config['franka']['sensor'].remove(sensor)
-                for actuator in robot_config['franka']['actuator']:
-                    if actuator['name'] == joint_name:
-                        robot_config['franka']['actuator'].remove(actuator)
-
-            model_path = model_path[:-4] + "_removed.xml"
-            config_path = config_path[:-7] + "_removed.config"
-
-            with open(curr_dir + model_path, 'w') as file:
-                file.write(raw_xml)
-
-            with open(config_path, 'w') as file:
-                file.write(str(robot_config))
-
-        super().__init__(model_path, target_xy_range, ball_xy_range, obsd_model_path, seed,
-                         config_path=config_path, **kwargs)
