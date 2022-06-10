@@ -11,7 +11,9 @@ from mj_envs.envs import env_base
 from mj_envs.utils.xml_utils import reassign_parent
 import os
 import collections
+from threading import Lock
 
+wr_lock = Lock()
 class FrankaDmanusPose(env_base.MujocoEnv):
 
     DEFAULT_OBS_KEYS = [
@@ -31,6 +33,8 @@ class FrankaDmanusPose(env_base.MujocoEnv):
         raw_xml = raw_sim.model.get_xml()
         processed_xml = reassign_parent(xml_str=raw_xml, receiver_node="panda0_link7", donor_node="DManus_mount")
         processed_model_path = curr_dir+model_path[:-4]+"_processed.xml"
+
+        wr_lock.acquire()
         with open(processed_model_path, 'w') as file:
             file.write(processed_xml)
 
@@ -63,6 +67,7 @@ class FrankaDmanusPose(env_base.MujocoEnv):
         os.remove(processed_model_path)
         if processed_obsd_model_path and processed_obsd_model_path!=processed_model_path:
             os.remove(processed_obsd_model_path)
+        wr_lock.release()
 
         self._setup(**kwargs)
 
