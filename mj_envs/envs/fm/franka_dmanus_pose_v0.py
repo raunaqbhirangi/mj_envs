@@ -133,7 +133,8 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         "penalty": -50,
     }
 
-    def __init__(self, model_path, removed_joint_ids, target_xy_range, ball_xy_range, obsd_model_path=None, seed=None, **kwargs):
+    def __init__(self, model_path, removed_joint_ids, target_xy_range, ball_xy_range, obsd_model_path=None, seed=None,
+                 **kwargs):
 
         self.target_xy_range = target_xy_range
         self.ball_xy_range = ball_xy_range
@@ -141,6 +142,7 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
 
         self.franka_njoints = 7
         self.dmanus_njoints = 9
+        self.njoints = self.franka_njoints + self.dmanus_njoints
         # Add code here to move sites onto palm
         super().__init__(model_path, obsd_model_path, seed, **kwargs)
 
@@ -164,14 +166,19 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
             self.target_type = 'random'
             self.target_ball_pos = self.sim.data.qpos[16:19].copy()  # fake target for setup
 
+        # Make changes for new action and observation spaces
+        self.qpos_mask = np.ones_like(self.sim.data.qpos.ravel(), dtype=bool)
+        self.qpos_mask[self.removed_joint_ids] = 0
+
+        self.qvel_mask = np.ones_like(self.sim.data.qvel.ravel(), dtype=bool)
+        self.qvel_mask[self.removed_joint_ids] = 0
+
         env_base.MujocoEnv._setup(self, obs_keys=obs_keys,
                                   weighted_reward_keys=weighted_reward_keys,
                                   frame_skip=40,
                                   **kwargs)
         if franka_init is not None:
             self.init_qpos[:7] = franka_init
-
-        # Make changes for new action space
 
         self.action_mask = np.ones_like(self.action_space.low, dtype=bool)
         self.action_mask[self.removed_joint_ids] = 0
@@ -279,14 +286,17 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         obs_dict['qp'] = sim.data.qpos.copy()
         obs_dict['qv'] = sim.data.qvel.copy()
 
+        obs_dict['reduced_qp'] = obs_dict['qp'][self.qpos_mask]
+        obs_dict['reduced_qv'] = obs_dict['qv'][self.qvel_mask]
+
         # Add magnetometer measurements here
-        obs_dict['ball'] = self.sim.data.qpos[16:19].copy()
-        obs_dict['dball'] = self.sim.data.qvel[16:19].copy() * self.dt
+        obs_dict['ball'] = self.sim.data.qpos[self.njoints:self.njoints + 3].copy()
+        obs_dict['dball'] = self.sim.data.qvel[self.njoints:self.njoints + 3].copy() * self.dt
         obs_dict['target'] = self.sim.data.site_xpos[self.target_sid].copy()
 
         # Change this to only look at target pose for the ball
         obs_dict['target_err'] = obs_dict['ball'] - self.target_ball_pos
-
+        # print(len(self.sim.data.contact))
         # Add code for mags and magdiffs
         return obs_dict
 
@@ -303,7 +313,7 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
             # Must keys
             ('sparse', -1.0 * reach_dist),
             ('solved', reach_dist < .03),
-            ('done',    reach_dist > far_th),
+            ('done', reach_dist > far_th),
         ))
         rwd_dict['dense'] = np.sum([wt * rwd_dict[key] for key, wt in self.rwd_keys_wt.items()], axis=0)
         return rwd_dict
@@ -318,9 +328,11 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         self.sim.model.site_pos[self.init_sid][::2] = self.np_random.uniform(
             low=self.ball_xy_range[0], high=self.ball_xy_range[1])
         self.sim.forward()
+        self.target_ball_pos = self.sim.data.site_xpos[self.target_sid].copy()
 
         # move the ball to the init_site
         qp = self.init_qpos.copy()
+
         qp[16:19] = self.sim.data.site_xpos[self.init_sid]
 
         obs = env_base.MujocoEnv.reset(self, reset_qpos=qp)
@@ -337,16 +349,16 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         extended_a = self.init_robot_action.copy()
         extended_a[self.action_mask] = a
         self.last_ctrl = self.robot.step(ctrl_desired=extended_a,
-                                        ctrl_normalized=self.normalize_act,
-                                        step_duration=self.dt,
-                                        realTimeSim=self.mujoco_render_frames,
-                                        render_cbk=self.mj_render if self.mujoco_render_frames else None)
+                                         ctrl_normalized=self.normalize_act,
+                                         step_duration=self.dt,
+                                         realTimeSim=self.mujoco_render_frames,
+                                         render_cbk=self.mj_render if self.mujoco_render_frames else None)
 
         # observation
         obs = self.get_obs()
 
         # rewards
-        self.expand_dims(self.obs_dict) # required for vectorized rewards calculations
+        self.expand_dims(self.obs_dict)  # required for vectorized rewards calculations
         self.rwd_dict = self.get_reward_dict(self.obs_dict)
         self.squeeze_dims(self.rwd_dict)
         self.squeeze_dims(self.obs_dict)
@@ -355,5 +367,4 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
         env_info = self.get_env_infos()
 
         # returns obs(t+1), rew(t), done(t), info(t+1)
-        return obs, env_info['rwd_'+self.rwd_mode], bool(env_info['done']), env_info
-
+        return obs, env_info['rwd_' + self.rwd_mode], bool(env_info['done']), env_info
