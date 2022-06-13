@@ -11,6 +11,7 @@ from mj_envs.envs import env_base
 from mj_envs.utils.xml_utils import reassign_parent, remove_joint
 import os
 import collections
+import torch
 
 
 class FrankaDmanusPose(env_base.MujocoEnv):
@@ -180,6 +181,97 @@ class FrankaDmanusPoseWithBall(FrankaDmanusPose):
 
         init_robot_qpos = self.init_qpos[:self.franka_njoints + self.dmanus_njoints]
         self.init_robot_action = self.robot.normalize_actions(init_robot_qpos)
+
+    def get_mag_obs(self, sim):
+        """
+        Use simulation data to identify contacts. Use contact location and force
+        to simulate magnetic field data from ReSkin.
+
+        Parameters
+        ----------
+        sim: MjSim object
+        """
+
+        num_mags = len(self.mag_names)
+        mag_obs = np.zeros((num_mags, 3))
+
+        # Create a copy of original colors
+        colors = self.site_colors.copy()
+
+        # Detection threshold distance for magnetometer
+        # (16 mm Manhattan distance)
+        mag_thres = 0.035
+
+        # Check for contacts
+        for con_id in range(sim.data.ncon):
+            c = sim.data.contact[con_id]
+
+            # Get ids for the colliding bodies
+            body1_id = sim.model.geom_bodyid[c.geom1]
+            body2_id = sim.model.geom_bodyid[c.geom2]
+
+            body2_xmat = sim.data.body_xmat[body2_id].reshape((3, 3))
+            # For now just assumes that the second geom is on the hand.
+            # TODO: Ask vikash how to check if it belongs to dmanus.
+            # ipdb.set_trace()
+
+            # Filter sites with body id matching collision body and make
+            # sure they're magnetometers
+            sites_mask = (sim.model.site_bodyid == body2_id) * self.mag_mask
+
+            # Find site closest to contact point, if there are any
+            # sites on the body
+            if np.sum(sites_mask) != 0:
+                sites_r = c.pos - sim.data.site_xpos[sites_mask]
+                sites_r_local = sites_r @ body2_xmat
+
+                sites_dist = np.linalg.norm(sites_r_local[..., ::2], ord=2, axis=-1)
+                # sites_mandist = np.linalg.norm(sites_r, ord=1, axis=-1)
+
+                # v0.1: Just light up the closest magnetometer
+                closest_site = np.argmin(sites_dist)
+                closest_site_id = np.arange(len(sites_mask))[sites_mask][closest_site]
+
+                # # Change color to red
+                # colors[closest_site_id] = [1.,0.,0.,1.]
+
+                # v1.0: Predict magnetic field for all magnetometers within
+                # range
+                mags_in_range = sites_dist < mag_thres
+                mags_in_range_ids = np.arange(len(sites_mask))[sites_mask][mags_in_range]
+                # Need to project sites_r to mag coordinate frame
+                # ipdb.set_trace()
+
+                contact_location_xy = sites_r_local[..., ::2]
+                mag_output = self.get_mag_output(contact_location_xy, mags_in_range, mag_thres)
+
+                mag_obs[sites_mask[self.mag_mask]] = mag_output
+
+                # Color magnetometers based on outputs
+                mags_in_range_ids = np.arange(len(sites_mask))[sites_mask][mags_in_range]
+                colors[mags_in_range_ids, :3] = np.clip(0.5 + mag_output[mags_in_range] / 2, -1., 1.)
+
+        self.sim.model.site_rgba[:, :] = colors
+
+        return mag_obs.reshape((-1,))
+
+    def get_mag_output(self, contact_location_xy, mags_in_range, mag_thres):
+        # Default scaling for input distances is 8mm. Magnetometers here are much further apart.
+        # So we use a different scaling factor to make sure NN inputs stay within distribution.
+        curr_scaling_mm = self.mag_model_config['input_std'] * 0.001
+        new_scaling = mag_thres / np.sqrt(2)
+        magout = np.zeros((len(contact_location_xy), 3))
+        if np.sum(mags_in_range) > 0:
+            scaled_loc = torch.tensor(contact_location_xy / new_scaling, dtype=torch.float)
+
+            with torch.no_grad():
+                magdist = self.mag_model(scaled_loc)
+                magdist = magdist[mags_in_range]
+            magout[mags_in_range] = torch.distributions.normal.Normal(
+                magdist[..., :3], torch.exp(magdist[..., 3:])).sample()
+            # magout[mags_in_range] = magdist[...,:3]
+
+        return magout
 
     def get_obs_dict(self, sim):
         obs_dict = {}

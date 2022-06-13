@@ -15,6 +15,7 @@
     <include file="../../../sims/franka_sim/assets/assets.xml"/>
     <include file="../../../sims/franka_sim/assets/actuator0.xml"/>
     <include file="../../../sims/dmanus_sim/assets/dmanus_assets.xml"/>
+    <include file="../../../sims/dmanus_sim/assets/dmanus_skin/dmanus_skin_assets.xml"/>
 
     <compiler inertiafromgeom="auto" inertiagrouprange="3 4" angle="radian" meshdir="../../../sims/franka_sim" texturedir="../../../sims/franka_sim"/>
 
